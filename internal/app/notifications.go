@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"io"
 	"log"
 	"math"
 	"net"
@@ -116,10 +115,10 @@ func (a *App) sendEmail(email queuedEmail) error {
 		return fmt.Errorf("invalid SMTP_PORT %q", a.cfg.SMTPPort)
 	}
 
-	message := []byte(fmt.Sprintf(
+	message := fmt.Appendf(nil,
 		"From: %s\r\nTo: %s\r\nSubject: %s\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n%s",
 		from.String(), to.String(), email.subject, email.body,
-	))
+	)
 	address := net.JoinHostPort(a.cfg.SMTPHost, strconv.Itoa(port))
 	connection, err := net.DialTimeout("tcp", address, 10*time.Second)
 	if err != nil {
@@ -160,7 +159,7 @@ func (a *App) sendEmail(email queuedEmail) error {
 	if err != nil {
 		return err
 	}
-	if _, err := io.WriteString(body, string(message)); err != nil {
+	if _, err := body.Write(message); err != nil {
 		return err
 	}
 	if err := body.Close(); err != nil {

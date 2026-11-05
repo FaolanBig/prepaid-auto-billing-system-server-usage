@@ -104,7 +104,7 @@ func (a *App) login(w http.ResponseWriter, r *http.Request) {
 		Value:    encoded + "." + signature,
 		Path:     "/",
 		Expires:  expires,
-		MaxAge:   int(expires.Sub(time.Now()).Seconds()),
+		MaxAge:   int(time.Until(expires).Seconds()),
 		HttpOnly: true,
 		Secure:   a.cfg.CookieSecure,
 		SameSite: http.SameSiteStrictMode,
