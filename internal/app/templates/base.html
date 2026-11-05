@@ -1,0 +1,45 @@
+{{define "base-start"}}<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{.Title}} · Power Billing</title>
+  <style>
+    :root{font-family:system-ui,sans-serif;color:#17212b;background:#f4f6f8}
+    body{margin:0}header{background:#183153;color:white;padding:1rem max(1rem,calc((100% - 1100px)/2));display:flex;align-items:center;justify-content:space-between}
+    header a{color:white;text-decoration:none;margin-right:1rem}header strong{font-size:1.1rem}
+    main{max-width:1100px;margin:2rem auto;padding:0 1rem}.nav{display:flex;align-items:center;gap:1rem}
+    .card{background:white;border:1px solid #dce2e8;border-radius:8px;padding:1.1rem;margin:1rem 0}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem}
+    .metric{font-size:1.6rem;font-weight:650;margin-top:.3rem}.muted{color:#5d6875;font-size:.92rem}
+    h1{margin-top:0}h2{font-size:1.15rem}table{width:100%;border-collapse:collapse;background:white}
+    th,td{text-align:left;padding:.7rem;border-bottom:1px solid #e1e6eb;vertical-align:top}
+    th{background:#edf1f5}form.inline{display:inline-flex;gap:.4rem;align-items:center}
+    label{display:block;font-weight:600;margin:.8rem 0 .25rem}input,select,button{font:inherit;padding:.55rem;border:1px solid #b7c1cb;border-radius:4px}
+    input[type=number],input[type=email],input[type=text],input[type=password]{max-width:100%;box-sizing:border-box}
+    button,.button{background:#245b91;color:white;border:0;text-decoration:none;cursor:pointer;padding:.6rem .9rem;border-radius:4px}
+    button.secondary,.button.secondary{background:#536477}button.danger{background:#a83232}
+    .notice{background:#e5f4e8;padding:.8rem;border-radius:4px}.error{background:#fde8e8;color:#8e2020;padding:.8rem;border-radius:4px}
+    .actions{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap}.form-row{margin:.8rem 0}.narrow{max-width:620px}
+    @media(max-width:700px){header{display:block}.nav{margin-top:.8rem;flex-wrap:wrap}table{font-size:.88rem}}
+  </style>
+</head>
+<body>
+<header>
+  <strong><a href="/">Power Billing</a></strong>
+  <nav class="nav">
+    <a href="/">Dashboard</a><a href="/users">Users</a><a href="/settings">Settings</a><a href="/exports">Exports</a><a href="/logs">Logs</a>
+    <form method="post" action="/logout">
+      <input type="hidden" name="csrf" value="{{.CSRF}}">
+      <button class="secondary" type="submit">Sign out</button>
+    </form>
+  </nav>
+</header>
+<main>
+  <h1>{{.Title}}</h1>
+  {{if .Notice}}<p class="notice">{{.Notice}}</p>{{end}}
+  {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+{{end}}
+{{define "base-end"}}</main>
+</body>
+</html>{{end}}

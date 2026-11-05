@@ -1,0 +1,30 @@
+{{define "users"}}{{template "base-start" .}}{{template "users-content" .}}{{template "base-end" .}}{{end}}
+{{define "users-content"}}
+<div class="actions"><a class="button" href="/users/new">Add user</a></div>
+<section class="card">
+  {{if .Data.Users}}
+  <table><thead><tr><th>Name / email</th><th>Status</th><th>Balance</th><th>Actions</th></tr></thead><tbody>
+  {{range .Data.Users}}
+  <tr>
+    <td>{{.Name}}<br><span class="muted">{{.Email}}</span></td>
+    <td>{{if .Active}}Active{{else}}Removed{{end}}</td>
+    <td>{{money .BalanceCents}}</td>
+    <td>
+      <form class="inline" method="post" action="/users/{{.ID}}/credit">
+        <input type="hidden" name="csrf" value="{{$.CSRF}}">
+        <input type="number" name="amount" min="0.01" step="0.01" required aria-label="Amount to add in euros">
+        <button type="submit">Add funds</button>
+      </form>
+      {{if .Active}}
+      <form class="inline" method="post" action="/users/{{.ID}}/deactivate">
+        <input type="hidden" name="csrf" value="{{$.CSRF}}">
+        <button class="danger" type="submit">Remove</button>
+      </form>
+      {{end}}
+    </td>
+  </tr>
+  {{end}}
+  </tbody></table>
+  {{else}}<p>No users yet. Add one to start allocating energy costs.</p>{{end}}
+</section>
+{{end}}

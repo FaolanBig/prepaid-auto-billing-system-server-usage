@@ -1,0 +1,21 @@
+{{define "logs"}}{{template "base-start" .}}{{template "logs-content" .}}{{template "base-end" .}}{{end}}
+{{define "logs-content"}}
+<section class="card">
+  <h2>Recent audit events</h2>
+  {{if .Data.Events}}
+  <table><thead><tr><th>Time (UTC)</th><th>Event</th><th>Details</th></tr></thead><tbody>
+  {{range .Data.Events}}<tr><td>{{.CreatedAt}}</td><td>{{.Event}}</td><td>{{.Details}}</td></tr>{{end}}
+  </tbody></table>
+  {{else}}<p>No events have been recorded yet.</p>{{end}}
+</section>
+<section class="card">
+  <h2>Email delivery</h2>
+  <p>Unsent notifications: <strong>{{.Data.PendingEmails}}</strong></p>
+  <p>Notifications with delivery errors: <strong>{{.Data.FailedEmails}}</strong></p>
+  {{if .Data.Emails}}
+  <table><thead><tr><th>Queued (UTC)</th><th>Recipient</th><th>Status</th><th>Attempts</th><th>Last error</th></tr></thead><tbody>
+  {{range .Data.Emails}}<tr><td>{{.CreatedAt}}</td><td>{{.Recipient}}</td><td>{{.Status}}</td><td>{{.Attempts}}</td><td>{{.Error}}</td></tr>{{end}}
+  </tbody></table>
+  {{end}}
+</section>
+{{end}}

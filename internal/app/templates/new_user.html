@@ -1,0 +1,13 @@
+{{define "new_user"}}{{template "base-start" .}}{{template "new_user-content" .}}{{template "base-end" .}}{{end}}
+{{define "new_user-content"}}
+<section class="card narrow">
+  <form method="post" action="/users">
+    <input type="hidden" name="csrf" value="{{.CSRF}}">
+    <div class="form-row"><label for="name">Name</label><input id="name" name="name" type="text" maxlength="160" required value="{{.Data.Name}}"></div>
+    <div class="form-row"><label for="email">Email</label><input id="email" name="email" type="email" maxlength="320" required value="{{.Data.Email}}"></div>
+    <div class="form-row"><label for="deposit">Initial contingent (€)</label><input id="deposit" name="deposit" type="number" min="0" step="0.01" value="{{.Data.Deposit}}"></div>
+    <p class="muted">The initial amount is recorded as a wallet top-up. Membership starts when this form is submitted.</p>
+    <button type="submit">Create user</button> <a class="button secondary" href="/users">Cancel</a>
+  </form>
+</section>
+{{end}}

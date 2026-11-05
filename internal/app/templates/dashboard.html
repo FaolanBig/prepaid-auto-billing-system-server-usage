@@ -1,0 +1,25 @@
+{{define "dashboard"}}{{template "base-start" .}}{{template "dashboard-content" .}}{{template "base-end" .}}{{end}}
+{{define "dashboard-content"}}
+<div class="grid">
+  <section class="card"><div class="muted">Active users</div><div class="metric">{{.Data.ActiveUsers}}</div></section>
+  <section class="card"><div class="muted">Energy in last 24 hours</div><div class="metric">{{printf "%.3f" .Data.Energy24hKWh}} kWh</div></section>
+  <section class="card"><div class="muted">Current Shelly power</div><div class="metric">{{printf "%.1f" .Data.PowerW}} W</div></section>
+  <section class="card"><div class="muted">Electricity rate</div><div class="metric">{{.Data.RateText}}</div></section>
+</div>
+<section class="card">
+  <h2>System status</h2>
+  <p>Shelly last read: <strong>{{.Data.LastSample}}</strong></p>
+  <p>Billing cadence: every <strong>{{.Data.IntervalHours}} hours</strong></p>
+  <p>Next billing run: <strong>{{.Data.NextBilling}}</strong></p>
+  <p>Pending email notifications: <strong>{{.Data.PendingEmails}}</strong></p>
+  {{if not .Data.ShellyConfigured}}<p class="error">Shelly polling is disabled. Configure SHELLY_URL in the environment.</p>{{end}}
+</section>
+<section class="card">
+  <h2>Recent billing runs</h2>
+  {{if .Data.RecentRuns}}
+  <table><thead><tr><th>Period</th><th>Energy</th><th>Charged</th></tr></thead><tbody>
+  {{range .Data.RecentRuns}}<tr><td>{{.PeriodStart}} – {{.PeriodEnd}}</td><td>{{printf "%.3f" .EnergyKWh}} kWh</td><td>{{money .CostCents}}</td></tr>{{end}}
+  </tbody></table>
+  {{else}}<p class="muted">No billing runs have completed yet.</p>{{end}}
+</section>
+{{end}}

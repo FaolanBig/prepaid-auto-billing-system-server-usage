@@ -1,0 +1,25 @@
+{{define "settings"}}{{template "base-start" .}}{{template "settings-content" .}}{{template "base-end" .}}{{end}}
+{{define "settings-content"}}
+<section class="card narrow">
+  <form method="post" action="/settings">
+    <input type="hidden" name="csrf" value="{{.CSRF}}">
+    <div class="form-row">
+      <label for="rate">Electricity price (€ per kWh)</label>
+      <input id="rate" name="rate" type="number" min="0" max="9999.999999" step="0.000001" required value="{{.Data.RateValue}}">
+      <p class="muted">The rate is snapshotted for each measured energy interval. New rates apply to new readings.</p>
+    </div>
+    <div class="form-row">
+      <label for="interval">Billing interval (hours)</label>
+      <input id="interval" name="interval" type="number" min="1" max="8760" step="1" required value="{{.Data.IntervalHours}}">
+      <p class="muted">The default is 24 hours. Changing the interval schedules the next run from the time you save.</p>
+    </div>
+    <p>Next billing run: <strong>{{.Data.NextBilling}}</strong></p>
+    <button type="submit">Save settings</button>
+  </form>
+</section>
+<section class="card">
+  <h2>Runtime configuration</h2>
+  <p>Sampling frequency: every {{.Data.PollSeconds}} seconds. Configure this with <code>SHELLY_POLL_SECONDS</code> and restart the app.</p>
+  <p>Email delivery uses the SMTP settings provided to the app container.</p>
+</section>
+{{end}}

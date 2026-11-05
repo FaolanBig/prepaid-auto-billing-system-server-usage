@@ -1,0 +1,16 @@
+{{define "login"}}<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Admin sign in · Power Billing</title>
+<style>
+body{font-family:system-ui,sans-serif;background:#f4f6f8;color:#17212b;margin:0;min-height:100vh;display:grid;place-items:center}
+main{background:white;border:1px solid #dce2e8;border-radius:8px;padding:2rem;width:min(90vw,360px)}
+label{display:block;font-weight:600;margin:.8rem 0 .25rem}input,button{font:inherit;box-sizing:border-box;width:100%;padding:.65rem;border:1px solid #b7c1cb;border-radius:4px}
+button{background:#245b91;color:white;border:0;margin-top:1.2rem;cursor:pointer}.error{background:#fde8e8;color:#8e2020;padding:.8rem;border-radius:4px}
+</style></head>
+<body><main><h1>Power Billing</h1><p>Administrator sign in</p>
+{{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+<form method="post" action="/login">
+  <label for="username">Username</label><input id="username" name="username" autocomplete="username" required>
+  <label for="password">Password</label><input id="password" name="password" type="password" autocomplete="current-password" required>
+  <button type="submit">Sign in</button>
+</form></main></body></html>{{end}}
