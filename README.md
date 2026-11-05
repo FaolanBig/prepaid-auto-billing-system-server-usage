@@ -10,7 +10,7 @@ A Docker Compose application for monitoring a Shelly Plug M Gen3, recording powe
 - Splits each measured energy interval equally among users who were members during that interval. If membership changes within a poll interval, the energy is allocated by the duration each membership overlaps; this assumes energy was consumed uniformly during that short interval.
 - Calculates cost using the configurable fixed rate in euros per kWh, records each charge, and reduces each user's prepaid balance.
 - Queues email to the user and administrator after every billing run while that user's balance is below zero. Failed email delivery is logged and retried.
-- Lets the administrator add users, remove them without deleting history, refill balances, change the rate and billing interval, and download CSV exports.
+- Lets the administrator add, remove, and reactivate users without deleting history, refill balances, configure the rate and billing schedule, and download CSV exports.
 
 ## Deployment on server1
 
@@ -43,17 +43,19 @@ The Compose stack keeps PostgreSQL and InfluxDB ports private to the Compose net
 
 1. Sign in with `ADMIN_USERNAME` and `ADMIN_PASSWORD`.
 2. Open **Settings** and enter the electricity price in euros per kWh. For example, enter `0.350000` for €0.35/kWh.
-3. Set the billing interval in hours. It defaults to 24 hours; setting 1 runs hourly. Saving a different interval schedules the next run from the time of the change.
+3. Configure the billing interval, local clock time, and IANA timezone. Defaults are 24 hours, `00:00`, and `Europe/Berlin`. A 24-hour interval runs daily at the configured local time. Other intervals repeat by their hour length, anchored to that clock time.
 4. Add users and their initial prepaid contingents under **Users**.
 5. Check the dashboard for the latest Shelly sample and next billing run. Check `docker compose logs app` if the device or SMTP server cannot be reached.
 
-Billing starts after the first complete configured interval. If the tariff is configured after measurements have already been collected, intervals without a saved tariff use the tariff in effect when they are billed. Once set, each new interval snapshots the current tariff, so later tariff changes do not reprice existing intervals.
+The first run is scheduled for the next matching occurrence of the configured local clock time after the rate is saved. Changing the interval, clock time, or timezone recalculates the next run; changing only the rate does not shift the schedule. If the tariff is configured after measurements have already been collected, intervals without a saved tariff use the tariff in effect when they are billed. Once set, each new interval snapshots the current tariff, so later tariff changes do not reprice existing intervals.
 
 ## Data and billing details
 
 - The first valid Shelly reading establishes the cumulative-energy baseline; it is not billed. Subsequent positive energy-counter differences become energy intervals. If the counter decreases (for example, after a device reset), the app resets the baseline and does not create a negative charge.
 - InfluxDB stores `shelly_power` points with `power_w` and `energy_total_wh` fields. PostgreSQL stores the interval ledger used for billing and exports.
-- Removed users are deactivated, not deleted. Their membership end time is retained and their balance/history remains available.
+- Removed users are deactivated, not deleted. Reactivating one starts a new membership period; it does not erase the gap while they were inactive, change their balance, or remove their history.
+- If a reactivated user has a negative balance, that balance remains negative and they continue to receive notifications on billing runs until it is refilled.
+- Billing uses the selected IANA timezone. Intervals that are whole-day multiples preserve the configured local clock across daylight-saving changes; the elapsed duration can therefore be 23 or 25 hours on a transition day. Other intervals advance by elapsed hours from the configured clock anchor.
 - Energy measured when no user membership is active is recorded in total meter consumption but is not charged to a user.
 - Rates are entered in euros per kWh to six decimal places. User charge amounts are rounded to cents; rounding remainders are assigned deterministically so the sum of user charges equals the rounded cost of the allocated energy.
 - Dates shown and accepted by the export form are UTC. Both endpoints in an export date range are inclusive.

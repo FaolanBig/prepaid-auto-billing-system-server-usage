@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"syscall"
 	"time"
+	_ "time/tzdata"
 
 	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
 	"github.com/jackc/pgx/v5/pgxpool"

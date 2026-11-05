@@ -23,6 +23,8 @@ type dashboardData struct {
 	PowerW           float64
 	RateText         string
 	IntervalHours    int
+	BillingTime      string
+	BillingTimezone  string
 	LastSample       string
 	NextBilling      string
 	PendingEmails    int
@@ -58,6 +60,8 @@ type newUserData struct {
 type settingsData struct {
 	RateValue     string
 	IntervalHours int
+	BillingTime   string
+	Timezone      string
 	NextBilling   string
 	PollSeconds   int
 }
@@ -110,17 +114,25 @@ func (a *App) dashboard(w http.ResponseWriter, r *http.Request) {
 
 	var rate *int64
 	var next *time.Time
+	var locationName string
 	if err := a.db.QueryRow(ctx, `
-		SELECT price_per_kwh_micros, billing_interval_hours, next_billing_at
+		SELECT price_per_kwh_micros, billing_interval_hours, next_billing_at,
+		       to_char(billing_time, 'HH24:MI'), billing_timezone
 		FROM settings WHERE singleton = TRUE
-	`).Scan(&rate, &data.IntervalHours, &next); err != nil {
+	`).Scan(&rate, &data.IntervalHours, &next, &data.BillingTime, &locationName); err != nil {
 		a.serverError(w, "load billing settings", err)
 		return
 	}
+	location, err := time.LoadLocation(locationName)
+	if err != nil {
+		a.serverError(w, "load billing timezone", err)
+		return
+	}
+	data.BillingTimezone = locationName
 	if rate != nil {
 		data.RateText = "€" + formatRate(*rate) + " / kWh"
 	}
-	data.NextBilling = formatOptionalDate(next)
+	data.NextBilling = formatScheduleDate(next, location, locationName)
 
 	var lastSample *time.Time
 	if err := a.db.QueryRow(ctx, `
@@ -334,6 +346,19 @@ func (a *App) deactivateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback(ctx)
+	var active bool
+	if err := tx.QueryRow(ctx, `SELECT is_active FROM users WHERE id = $1 FOR UPDATE`, userID).Scan(&active); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			http.NotFound(w, r)
+			return
+		}
+		a.serverError(w, "load user status", err)
+		return
+	}
+	if !active {
+		http.Redirect(w, r, "/users?notice=removed", http.StatusSeeOther)
+		return
+	}
 	tag, err := tx.Exec(ctx, `
 		UPDATE membership_periods SET ended_at = GREATEST(started_at, NOW())
 		WHERE user_id = $1 AND ended_at IS NULL
@@ -343,16 +368,7 @@ func (a *App) deactivateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if tag.RowsAffected() == 0 {
-		var exists bool
-		if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM users WHERE id = $1)`, userID).Scan(&exists); err != nil {
-			a.serverError(w, "check user", err)
-			return
-		}
-		if !exists {
-			http.NotFound(w, r)
-			return
-		}
-		http.Redirect(w, r, "/users?notice=removed", http.StatusSeeOther)
+		a.serverError(w, "remove user", fmt.Errorf("active user %d has no open membership period", userID))
 		return
 	}
 	if _, err := tx.Exec(ctx, `UPDATE users SET is_active = FALSE WHERE id = $1`, userID); err != nil {
@@ -372,21 +388,76 @@ func (a *App) deactivateUser(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/users?notice=removed", http.StatusSeeOther)
 }
 
+func (a *App) reactivateUser(w http.ResponseWriter, r *http.Request) {
+	userID, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	ctx := r.Context()
+	tx, err := a.db.Begin(ctx)
+	if err != nil {
+		a.serverError(w, "reactivate user", err)
+		return
+	}
+	defer tx.Rollback(ctx)
+
+	var active bool
+	if err := tx.QueryRow(ctx, `SELECT is_active FROM users WHERE id = $1 FOR UPDATE`, userID).Scan(&active); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			http.NotFound(w, r)
+			return
+		}
+		a.serverError(w, "load user status", err)
+		return
+	}
+	if active {
+		http.Redirect(w, r, "/users?notice=already-active", http.StatusSeeOther)
+		return
+	}
+	if _, err := tx.Exec(ctx, `UPDATE users SET is_active = TRUE WHERE id = $1`, userID); err != nil {
+		a.serverError(w, "reactivate user", err)
+		return
+	}
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO membership_periods (user_id, started_at) VALUES ($1, NOW())
+	`, userID); err != nil {
+		a.serverError(w, "start reactivated membership", err)
+		return
+	}
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO audit_logs (event, details) VALUES ('user_reactivated', $1)
+	`, fmt.Sprintf("user_id=%d", userID)); err != nil {
+		a.serverError(w, "record user reactivation", err)
+		return
+	}
+	if err := tx.Commit(ctx); err != nil {
+		a.serverError(w, "save user reactivation", err)
+		return
+	}
+	http.Redirect(w, r, "/users?notice=reactivated", http.StatusSeeOther)
+}
+
 func (a *App) settingsPage(w http.ResponseWriter, r *http.Request) {
 	var rate *int64
 	var next *time.Time
 	data := settingsData{PollSeconds: int(a.cfg.PollInterval.Seconds())}
 	if err := a.db.QueryRow(r.Context(), `
-		SELECT price_per_kwh_micros, billing_interval_hours, next_billing_at
+		SELECT price_per_kwh_micros, billing_interval_hours, next_billing_at,
+		       to_char(billing_time, 'HH24:MI'), billing_timezone
 		FROM settings WHERE singleton = TRUE
-	`).Scan(&rate, &data.IntervalHours, &next); err != nil {
+	`).Scan(&rate, &data.IntervalHours, &next, &data.BillingTime, &data.Timezone); err != nil {
 		a.serverError(w, "load settings", err)
+		return
+	}
+	location, err := time.LoadLocation(data.Timezone)
+	if err != nil {
+		a.serverError(w, "load billing timezone", err)
 		return
 	}
 	if rate != nil {
 		data.RateValue = formatRate(*rate)
 	}
-	data.NextBilling = formatOptionalDate(next)
+	data.NextBilling = formatScheduleDate(next, location, data.Timezone)
 	csrf := a.csrfFromRequest(r)
 	a.render(w, "settings", "Settings", csrf, data, "", "")
 }
@@ -402,6 +473,25 @@ func (a *App) updateSettings(w http.ResponseWriter, r *http.Request) {
 		a.settingsError(w, r, "Billing interval must be between 1 and 8760 hours.")
 		return
 	}
+	billingTime := strings.TrimSpace(r.FormValue("billing_time"))
+	if _, err := time.Parse("15:04", billingTime); err != nil {
+		a.settingsError(w, r, "Billing time must be in HH:MM format.")
+		return
+	}
+	timezone := strings.TrimSpace(r.FormValue("timezone"))
+	if len(timezone) > 64 {
+		a.settingsError(w, r, "Enter a valid IANA timezone.")
+		return
+	}
+	if _, err := time.LoadLocation(timezone); err != nil {
+		a.settingsError(w, r, "Enter a valid IANA timezone, for example Europe/Berlin.")
+		return
+	}
+	nextBillingAt, err := nextBillingOccurrence(time.Now(), hours, billingTime, timezone)
+	if err != nil {
+		a.settingsError(w, r, "Unable to calculate the next billing time.")
+		return
+	}
 	ctx := r.Context()
 	tx, err := a.db.Begin(ctx)
 	if err != nil {
@@ -412,21 +502,25 @@ func (a *App) updateSettings(w http.ResponseWriter, r *http.Request) {
 	_, err = tx.Exec(ctx, `
 		UPDATE settings SET
 			price_per_kwh_micros = $1,
+			billing_time = $3::time,
+			billing_timezone = $4,
 			next_billing_at = CASE
-				WHEN price_per_kwh_micros IS NULL OR billing_interval_hours <> $2 OR next_billing_at IS NULL
-					THEN NOW() + ($2 * INTERVAL '1 hour')
+				WHEN price_per_kwh_micros IS NULL OR billing_interval_hours <> $2
+				  OR billing_time <> $3::time OR billing_timezone <> $4 OR next_billing_at IS NULL
+					THEN $5
 				ELSE next_billing_at
 			END,
 			billing_interval_hours = $2
 		WHERE singleton = TRUE
-	`, rate, hours)
+	`, rate, hours, billingTime, timezone, nextBillingAt)
 	if err != nil {
 		a.serverError(w, "save billing settings", err)
 		return
 	}
 	if _, err := tx.Exec(ctx, `
 		INSERT INTO audit_logs (event, details) VALUES ('settings_updated', $1)
-	`, fmt.Sprintf("rate_micros=%d; billing_interval_hours=%d", rate, hours)); err != nil {
+	`, fmt.Sprintf("rate_micros=%d; billing_interval_hours=%d; billing_time=%s; billing_timezone=%s",
+		rate, hours, billingTime, timezone)); err != nil {
 		a.serverError(w, "record settings change", err)
 		return
 	}
@@ -705,10 +799,18 @@ func (a *App) settingsError(w http.ResponseWriter, r *http.Request, message stri
 	if hours < 1 || hours > 8760 {
 		hours = 24
 	}
+	billingTime := strings.TrimSpace(r.FormValue("billing_time"))
+	if billingTime == "" {
+		billingTime = "00:00"
+	}
+	timezone := strings.TrimSpace(r.FormValue("timezone"))
+	if timezone == "" {
+		timezone = "Europe/Berlin"
+	}
 	csrf := a.csrfFromRequest(r)
 	a.render(w, "settings", "Settings", csrf, settingsData{
-		RateValue: rate, IntervalHours: hours, NextBilling: "unchanged",
-		PollSeconds: int(a.cfg.PollInterval.Seconds()),
+		RateValue: rate, IntervalHours: hours, BillingTime: billingTime, Timezone: timezone,
+		NextBilling: "unchanged", PollSeconds: int(a.cfg.PollInterval.Seconds()),
 	}, message, "")
 }
 
@@ -732,6 +834,10 @@ func userNotice(value string) string {
 		return "User created."
 	case "removed":
 		return "User removed. Historical usage and billing records were retained."
+	case "reactivated":
+		return "User reactivated. Their existing balance and historical records were retained."
+	case "already-active":
+		return "That user is already active."
 	case "credited":
 		return "User balance updated."
 	default:
@@ -794,6 +900,13 @@ func formatOptionalDate(value *time.Time) string {
 		return "not scheduled"
 	}
 	return formatDate(*value)
+}
+
+func formatScheduleDate(value *time.Time, location *time.Location, timezone string) string {
+	if value == nil {
+		return "not scheduled"
+	}
+	return value.In(location).Format("2006-01-02 15:04 MST") + " (" + timezone + ")"
 }
 
 func euroAmount(cents int64) string {

@@ -10,6 +10,7 @@
   <h2>System status</h2>
   <p>Shelly last read: <strong>{{.Data.LastSample}}</strong></p>
   <p>Billing cadence: every <strong>{{.Data.IntervalHours}} hours</strong></p>
+  <p>Billing clock: <strong>{{.Data.BillingTime}} {{.Data.BillingTimezone}}</strong></p>
   <p>Next billing run: <strong>{{.Data.NextBilling}}</strong></p>
   <p>Pending email notifications: <strong>{{.Data.PendingEmails}}</strong></p>
   {{if not .Data.ShellyConfigured}}<p class="error">Shelly polling is disabled. Configure SHELLY_URL in the environment.</p>{{end}}

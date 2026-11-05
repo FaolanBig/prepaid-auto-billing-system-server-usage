@@ -31,5 +31,27 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 			return fmt.Errorf("apply schema statement: %w", err)
 		}
 	}
-	return tx.Commit(ctx)
+	if err := tx.Commit(ctx); err != nil {
+		return err
+	}
+
+	migrationTx, err := pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer migrationTx.Rollback(ctx)
+	tag, err := migrationTx.Exec(ctx, `
+		INSERT INTO schema_migrations (version, name)
+		VALUES (1, 'anchor billing schedule to configured local time')
+		ON CONFLICT (version) DO NOTHING
+	`)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 1 {
+		if _, err := migrationTx.Exec(ctx, `UPDATE settings SET next_billing_at = NULL WHERE singleton = TRUE`); err != nil {
+			return err
+		}
+	}
+	return migrationTx.Commit(ctx)
 }

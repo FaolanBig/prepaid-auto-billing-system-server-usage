@@ -62,22 +62,30 @@ func (a *App) billIfDue(ctx context.Context) error {
 	var intervalHours int
 	var rate *int64
 	var nextBillingAt *time.Time
+	var billingTime, timezone string
 	if err := tx.QueryRow(ctx, `
-		SELECT billing_interval_hours, price_per_kwh_micros, next_billing_at
+		SELECT billing_interval_hours, price_per_kwh_micros, next_billing_at,
+		       to_char(billing_time, 'HH24:MI'), billing_timezone
 		FROM settings WHERE singleton = TRUE FOR UPDATE
-	`).Scan(&intervalHours, &rate, &nextBillingAt); err != nil {
+	`).Scan(&intervalHours, &rate, &nextBillingAt, &billingTime, &timezone); err != nil {
 		return err
 	}
 
 	now := time.Now().UTC()
+	if rate == nil {
+		return tx.Commit(ctx)
+	}
 	if nextBillingAt == nil {
-		next := now.Add(time.Duration(intervalHours) * time.Hour)
+		next, err := nextBillingOccurrence(now, intervalHours, billingTime, timezone)
+		if err != nil {
+			return err
+		}
 		if _, err := tx.Exec(ctx, `UPDATE settings SET next_billing_at = $1 WHERE singleton = TRUE`, next); err != nil {
 			return err
 		}
 		return tx.Commit(ctx)
 	}
-	if now.Before(*nextBillingAt) || rate == nil {
+	if now.Before(*nextBillingAt) {
 		return tx.Commit(ctx)
 	}
 
@@ -190,7 +198,10 @@ func (a *App) billIfDue(ctx context.Context) error {
 	`, totalCostCents, runID); err != nil {
 		return err
 	}
-	next := now.Add(time.Duration(intervalHours) * time.Hour)
+	next, err := nextBillingAfter(*nextBillingAt, now, intervalHours, timezone)
+	if err != nil {
+		return err
+	}
 	if _, err := tx.Exec(ctx, `
 		UPDATE settings SET next_billing_at = $1 WHERE singleton = TRUE
 	`, next); err != nil {

@@ -46,6 +46,7 @@ func (a *App) Routes() http.Handler {
 	mux.Handle("POST /users", a.admin(http.HandlerFunc(a.createUser)))
 	mux.Handle("POST /users/{id}/credit", a.admin(http.HandlerFunc(a.creditUser)))
 	mux.Handle("POST /users/{id}/deactivate", a.admin(http.HandlerFunc(a.deactivateUser)))
+	mux.Handle("POST /users/{id}/reactivate", a.admin(http.HandlerFunc(a.reactivateUser)))
 	mux.Handle("GET /settings", a.admin(http.HandlerFunc(a.settingsPage)))
 	mux.Handle("POST /settings", a.admin(http.HandlerFunc(a.updateSettings)))
 	mux.Handle("GET /exports", a.admin(http.HandlerFunc(a.exportsPage)))

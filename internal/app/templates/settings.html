@@ -11,7 +11,16 @@
     <div class="form-row">
       <label for="interval">Billing interval (hours)</label>
       <input id="interval" name="interval" type="number" min="1" max="8760" step="1" required value="{{.Data.IntervalHours}}">
-      <p class="muted">The default is 24 hours. Changing the interval schedules the next run from the time you save.</p>
+      <p class="muted">The default is 24 hours. A 24-hour interval runs daily at the configured clock time. Other intervals repeat by their hour length, anchored to that clock time.</p>
+    </div>
+    <div class="form-row">
+      <label for="billing_time">Billing time</label>
+      <input id="billing_time" name="billing_time" type="time" required value="{{.Data.BillingTime}}">
+    </div>
+    <div class="form-row">
+      <label for="timezone">Billing timezone</label>
+      <input id="timezone" name="timezone" type="text" maxlength="64" required value="{{.Data.Timezone}}" placeholder="Europe/Berlin">
+      <p class="muted">Use an IANA timezone such as Europe/Berlin or UTC. The default is Europe/Berlin.</p>
     </div>
     <p>Next billing run: <strong>{{.Data.NextBilling}}</strong></p>
     <button type="submit">Save settings</button>

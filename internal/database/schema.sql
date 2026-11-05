@@ -2,10 +2,23 @@ CREATE TABLE IF NOT EXISTS settings (
     singleton BOOLEAN PRIMARY KEY DEFAULT TRUE CHECK (singleton),
     price_per_kwh_micros BIGINT,
     billing_interval_hours INTEGER NOT NULL DEFAULT 24 CHECK (billing_interval_hours BETWEEN 1 AND 8760),
+    billing_time TIME NOT NULL DEFAULT TIME '00:00',
+    billing_timezone TEXT NOT NULL DEFAULT 'Europe/Berlin',
     next_billing_at TIMESTAMPTZ
 );
 
 INSERT INTO settings (singleton) VALUES (TRUE) ON CONFLICT (singleton) DO NOTHING;
+
+ALTER TABLE settings
+    ADD COLUMN IF NOT EXISTS billing_time TIME NOT NULL DEFAULT TIME '00:00';
+ALTER TABLE settings
+    ADD COLUMN IF NOT EXISTS billing_timezone TEXT NOT NULL DEFAULT 'Europe/Berlin';
+
+CREATE TABLE IF NOT EXISTS schema_migrations (
+    version INTEGER PRIMARY KEY,
+    name TEXT NOT NULL,
+    applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 
 CREATE TABLE IF NOT EXISTS users (
     id BIGSERIAL PRIMARY KEY,

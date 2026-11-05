@@ -20,6 +20,11 @@
         <input type="hidden" name="csrf" value="{{$.CSRF}}">
         <button class="danger" type="submit">Remove</button>
       </form>
+      {{else}}
+      <form class="inline" method="post" action="/users/{{.ID}}/reactivate">
+        <input type="hidden" name="csrf" value="{{$.CSRF}}">
+        <button type="submit">Reactivate</button>
+      </form>
       {{end}}
     </td>
   </tr>

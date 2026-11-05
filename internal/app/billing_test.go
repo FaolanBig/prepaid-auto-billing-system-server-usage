@@ -139,7 +139,9 @@ func TestTemplatesParseAndRender(t *testing.T) {
 		data  any
 	}{
 		{"dashboard", "Dashboard", dashboardData{RecentRuns: []billingRunRow{}}},
-		{"users", "Users", usersData{Users: []userRow{}}},
+		{"users", "Users", usersData{Users: []userRow{
+			{ID: 7, Name: "Removed user", Email: "removed@example.test", Active: false},
+		}}},
 		{"new_user", "Add user", newUserData{Deposit: "0.00"}},
 		{"settings", "Settings", settingsData{IntervalHours: 24}},
 		{"exports", "Exports", nil},
@@ -155,6 +157,9 @@ func TestTemplatesParseAndRender(t *testing.T) {
 			}
 			if test.name == "login" && !strings.Contains(recorder.Body.String(), "Administrator sign in") {
 				t.Fatalf("login content missing: %s", recorder.Body.String())
+			}
+			if test.name == "users" && !strings.Contains(recorder.Body.String(), "/users/7/reactivate") {
+				t.Fatalf("removed user has no reactivation action: %s", recorder.Body.String())
 			}
 		})
 	}
