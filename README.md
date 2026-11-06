@@ -14,7 +14,7 @@ A Docker Compose application for monitoring a Shelly Plug M Gen3, recording powe
 
 ## Deployment on server1
 
-Install Docker Engine and the Docker Compose plugin on the Debian VM. Copy this repository to server1, then create the private environment file:
+Install Docker Engine and the Docker Compose plugin on the Debian VM. Copy the deployment files to server1, then create the private environment file:
 
 ```sh
 cp .env.example .env
@@ -22,7 +22,7 @@ cp .env.example .env
 
 Edit `.env` before starting the services:
 
-1. Replace all `replace-me` values. Generate secrets with `openssl rand -hex 32`.
+1. Set `APP_IMAGE_TAG` to a version tag that has been published to GHCR by the [Docker workflow](./.github/workflows/docker.yml). The example uses `v1.0.0`. Replace all `replace-me` values and generate secrets with `openssl rand -hex 32`.
 2. Set `SHELLY_URL` to the Shelly's local RPC URL, for example `http://192.168.1.50/rpc/Switch.GetStatus?id=0`. The Shelly must be reachable from server1. If Shelly authentication is enabled, set both `SHELLY_USERNAME` and `SHELLY_PASSWORD`.
 3. Configure `SMTP_HOST`, `SMTP_PORT`, `SMTP_FROM`, `ADMIN_EMAIL`, and, if required, `SMTP_USERNAME` and `SMTP_PASSWORD`. SMTP STARTTLS is required for delivery. The service will not start without SMTP and admin email settings because negative-balance notifications are a core billing requirement.
 4. Choose an administrator password with at least 16 characters and a unique cookie secret with at least 32 characters.
@@ -30,10 +30,13 @@ Edit `.env` before starting the services:
 Start the services:
 
 ```sh
-docker compose up -d --build
+docker compose pull app
+docker compose up -d
 docker compose ps
 docker compose logs -f app
 ```
+
+The application image is pulled from `ghcr.io/faolanbig/prepaid-auto-billing-system-server-usage` using the `APP_IMAGE_TAG` in `.env`; deployment does not build the application locally. The repository's Dockerfile is used by the GitHub Actions workflow to build and publish version-tagged images. To upgrade, set `APP_IMAGE_TAG` to another published version, then run `docker compose pull app` and `docker compose up -d`.
 
 The admin panel is available at `http://127.0.0.1:8080` on server1 with the default binding. To reach it remotely, use an SSH tunnel or configure a TLS reverse proxy. If you change `APP_BIND_ADDRESS` to expose the port on a network interface, put it behind HTTPS and set `COOKIE_SECURE=true`; do not expose the admin panel directly to the public internet over plain HTTP.
 
@@ -71,6 +74,7 @@ See [.env.example](./.env.example) for the full list. Important settings:
 |---|---|
 | `SHELLY_URL` | Shelly `Switch.GetStatus` local RPC URL |
 | `SHELLY_POLL_SECONDS` | Poll interval from 5 to 3600 seconds; default 60 |
+| `APP_IMAGE_TAG` | Published GHCR image tag to deploy |
 | `ADMIN_USERNAME`, `ADMIN_PASSWORD` | Initial administrator login |
 | `COOKIE_SECRET` | HMAC key for signed admin session cookies |
 | `COOKIE_SECURE` | Set to `true` when the panel is served over HTTPS |
