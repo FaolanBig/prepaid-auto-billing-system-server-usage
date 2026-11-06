@@ -1,8 +1,6 @@
 services:
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: ghcr.io/faolanbig/prepaid-auto-billing-system-server-usage:${APP_IMAGE_TAG:?Set APP_IMAGE_TAG to a published Git tag}
     restart: unless-stopped
     depends_on:
       postgres:

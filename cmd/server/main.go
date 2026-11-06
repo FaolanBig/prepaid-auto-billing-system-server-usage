@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -28,19 +29,10 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	poolConfig, err := pgxpool.ParseConfig("postgres://localhost")
+	poolConfig, err := postgresPoolConfig(cfg)
 	if err != nil {
 		log.Fatalf("configure PostgreSQL: %v", err)
 	}
-	poolConfig.ConnConfig.Host = cfg.DatabaseHost
-	port, err := strconv.ParseUint(cfg.DatabasePort, 10, 16)
-	if err != nil || port == 0 {
-		log.Fatalf("POSTGRES_PORT must be a valid TCP port")
-	}
-	poolConfig.ConnConfig.Port = uint16(port)
-	poolConfig.ConnConfig.Database = cfg.DatabaseName
-	poolConfig.ConnConfig.User = cfg.DatabaseUser
-	poolConfig.ConnConfig.Password = cfg.DatabasePass
 	pool, err := pgxpool.NewWithConfig(ctx, poolConfig)
 	if err != nil {
 		log.Fatalf("configure PostgreSQL pool: %v", err)
@@ -84,4 +76,25 @@ func main() {
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatalf("HTTP server: %v", err)
 	}
+}
+
+func postgresPoolConfig(cfg config.Config) (*pgxpool.Config, error) {
+	poolConfig, err := pgxpool.ParseConfig("postgres://localhost")
+	if err != nil {
+		return nil, err
+	}
+	port, err := strconv.ParseUint(cfg.DatabasePort, 10, 16)
+	if err != nil || port == 0 {
+		return nil, fmt.Errorf("POSTGRES_PORT must be a valid TCP port")
+	}
+	poolConfig.ConnConfig.Host = cfg.DatabaseHost
+	poolConfig.ConnConfig.Port = uint16(port)
+	poolConfig.ConnConfig.Database = cfg.DatabaseName
+	poolConfig.ConnConfig.User = cfg.DatabaseUser
+	poolConfig.ConnConfig.Password = cfg.DatabasePass
+	for _, fallback := range poolConfig.ConnConfig.Fallbacks {
+		fallback.Host = cfg.DatabaseHost
+		fallback.Port = uint16(port)
+	}
+	return poolConfig, nil
 }
