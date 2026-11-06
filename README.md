@@ -38,6 +38,17 @@ docker compose logs -f app
 
 The application image is pulled from `ghcr.io/faolanbig/prepaid-auto-billing-system-server-usage` using the `APP_IMAGE_TAG` in `.env`; deployment does not build the application locally. The repository's Dockerfile is used by the GitHub Actions workflow to build and publish version-tagged images. To upgrade, set `APP_IMAGE_TAG` to another published version, then run `docker compose pull app` and `docker compose up -d`.
 
+By default, Docker Compose reads `.env` from the current working directory. You can keep the environment file in a separate, private directory and specify its path with `--env-file`. Specify the Compose file with `-f` as well if you are running the commands from another directory. For example:
+
+```sh
+docker compose --env-file /etc/powerbilling/.env -f /opt/powerbilling/docker-compose.yml pull app
+docker compose --env-file /etc/powerbilling/.env -f /opt/powerbilling/docker-compose.yml up -d
+docker compose --env-file /etc/powerbilling/.env -f /opt/powerbilling/docker-compose.yml ps
+docker compose --env-file /etc/powerbilling/.env -f /opt/powerbilling/docker-compose.yml logs -f app
+```
+
+Replace those example paths with the actual locations of your `.env` and `docker-compose.yml`. Use `--env-file` on each Compose command that needs the deployment variables.
+
 The admin panel is available at `http://127.0.0.1:8080` on server1 with the default binding. To reach it remotely, use an SSH tunnel or configure a TLS reverse proxy. If you change `APP_BIND_ADDRESS` to expose the port on a network interface, put it behind HTTPS and set `COOKIE_SECURE=true`; do not expose the admin panel directly to the public internet over plain HTTP.
 
 The Compose stack keeps PostgreSQL and InfluxDB ports private to the Compose network and persists their data in named volumes. Back up both database volumes as well as a PostgreSQL logical dump as part of normal server maintenance. Keep `.env` private; it contains passwords and API tokens.
