@@ -167,6 +167,11 @@ func TestTemplatesParseAndRender(t *testing.T) {
 					!strings.Contains(recorder.Body.String(), `name="email"`)) {
 				t.Fatalf("user email edit form is missing: %s", recorder.Body.String())
 			}
+			if test.name == "users" &&
+				(!strings.Contains(recorder.Body.String(), "/users/7/name") ||
+					!strings.Contains(recorder.Body.String(), `name="name"`)) {
+				t.Fatalf("user name edit form is missing: %s", recorder.Body.String())
+			}
 		})
 	}
 }
@@ -186,6 +191,34 @@ func TestUpdateUserEmailRejectsInvalidAddress(t *testing.T) {
 
 	if response.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", response.Code, http.StatusBadRequest)
+	}
+}
+
+func TestUpdateUserNameRejectsInvalidName(t *testing.T) {
+	for _, test := range []struct {
+		name  string
+		value string
+	}{
+		{name: "empty"},
+		{name: "too long", value: strings.Repeat("x", 161)},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			app := &App{}
+			request := httptest.NewRequest(
+				http.MethodPost,
+				"/users/7/name",
+				strings.NewReader("name="+url.QueryEscape(test.value)),
+			)
+			request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			request.SetPathValue("id", "7")
+			response := httptest.NewRecorder()
+
+			app.updateUserName(response, request)
+
+			if response.Code != http.StatusBadRequest {
+				t.Fatalf("status = %d, want %d", response.Code, http.StatusBadRequest)
+			}
+		})
 	}
 }
 
