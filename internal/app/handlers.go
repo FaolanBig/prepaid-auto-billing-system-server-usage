@@ -327,6 +327,49 @@ func (a *App) updateUserEmail(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/users?notice=email-updated", http.StatusSeeOther)
 }
 
+func (a *App) updateUserName(w http.ResponseWriter, r *http.Request) {
+	userID, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	name := strings.TrimSpace(r.FormValue("name"))
+	if len(name) == 0 || len(name) > 160 {
+		http.Error(w, "Name must contain 1 to 160 characters.", http.StatusBadRequest)
+		return
+	}
+
+	ctx := r.Context()
+	tx, err := a.db.Begin(ctx)
+	if err != nil {
+		a.serverError(w, "update user name", err)
+		return
+	}
+	defer tx.Rollback(ctx)
+
+	var updatedID int64
+	if err := tx.QueryRow(ctx, `
+		UPDATE users SET name = $1 WHERE id = $2 RETURNING id
+	`, name, userID).Scan(&updatedID); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			http.NotFound(w, r)
+			return
+		}
+		a.serverError(w, "update user name", err)
+		return
+	}
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO audit_logs (event, details) VALUES ('user_name_updated', $1)
+	`, fmt.Sprintf("user_id=%d", updatedID)); err != nil {
+		a.serverError(w, "record user name change", err)
+		return
+	}
+	if err := tx.Commit(ctx); err != nil {
+		a.serverError(w, "save user name", err)
+		return
+	}
+	http.Redirect(w, r, "/users?notice=name-updated", http.StatusSeeOther)
+}
+
 func (a *App) creditUser(w http.ResponseWriter, r *http.Request) {
 	userID, ok := pathID(w, r)
 	if !ok {
@@ -892,6 +935,8 @@ func userNotice(value string) string {
 		return "User email address updated."
 	case "email-in-use":
 		return "That email address is already assigned to another user."
+	case "name-updated":
+		return "User name updated."
 	default:
 		return ""
 	}

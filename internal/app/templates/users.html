@@ -10,6 +10,11 @@
     <td>{{if .Active}}Active{{else}}Removed{{end}}</td>
     <td>{{money .BalanceCents}}</td>
     <td>
+      <form class="inline" method="post" action="/users/{{.ID}}/name">
+        <input type="hidden" name="csrf" value="{{$.CSRF}}">
+        <input type="text" name="name" maxlength="160" required value="{{.Name}}" aria-label="Name for {{.Name}}">
+        <button type="submit">Save name</button>
+      </form>
       <form class="inline" method="post" action="/users/{{.ID}}/email">
         <input type="hidden" name="csrf" value="{{$.CSRF}}">
         <input type="email" name="email" maxlength="320" required value="{{.Email}}" aria-label="Email address for {{.Name}}">
