@@ -10,6 +10,11 @@
     <td>{{if .Active}}Active{{else}}Removed{{end}}</td>
     <td>{{money .BalanceCents}}</td>
     <td>
+      <form class="inline" method="post" action="/users/{{.ID}}/email">
+        <input type="hidden" name="csrf" value="{{$.CSRF}}">
+        <input type="email" name="email" maxlength="320" required value="{{.Email}}" aria-label="Email address for {{.Name}}">
+        <button type="submit">Save email</button>
+      </form>
       <form class="inline" method="post" action="/users/{{.ID}}/credit">
         <input type="hidden" name="csrf" value="{{$.CSRF}}">
         <input type="number" name="amount" min="0.01" step="0.01" required aria-label="Amount to add in euros">
