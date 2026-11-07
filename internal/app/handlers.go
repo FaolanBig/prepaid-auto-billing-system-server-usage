@@ -279,6 +279,54 @@ func (a *App) createUser(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/users?notice=created", http.StatusSeeOther)
 }
 
+func (a *App) updateUserEmail(w http.ResponseWriter, r *http.Request) {
+	userID, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	email := strings.TrimSpace(r.FormValue("email"))
+	address, err := mail.ParseAddress(email)
+	if err != nil || address.Address != email || len(email) > 320 {
+		http.Error(w, "Enter a valid email address.", http.StatusBadRequest)
+		return
+	}
+
+	ctx := r.Context()
+	tx, err := a.db.Begin(ctx)
+	if err != nil {
+		a.serverError(w, "update user email", err)
+		return
+	}
+	defer tx.Rollback(ctx)
+
+	var updatedID int64
+	if err := tx.QueryRow(ctx, `
+		UPDATE users SET email = $1 WHERE id = $2 RETURNING id
+	`, email, userID).Scan(&updatedID); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			http.NotFound(w, r)
+			return
+		}
+		if strings.Contains(strings.ToLower(err.Error()), "users_email_unique") {
+			http.Redirect(w, r, "/users?notice=email-in-use", http.StatusSeeOther)
+			return
+		}
+		a.serverError(w, "update user email", err)
+		return
+	}
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO audit_logs (event, details) VALUES ('user_email_updated', $1)
+	`, fmt.Sprintf("user_id=%d", updatedID)); err != nil {
+		a.serverError(w, "record user email change", err)
+		return
+	}
+	if err := tx.Commit(ctx); err != nil {
+		a.serverError(w, "save user email", err)
+		return
+	}
+	http.Redirect(w, r, "/users?notice=email-updated", http.StatusSeeOther)
+}
+
 func (a *App) creditUser(w http.ResponseWriter, r *http.Request) {
 	userID, ok := pathID(w, r)
 	if !ok {
@@ -840,6 +888,10 @@ func userNotice(value string) string {
 		return "That user is already active."
 	case "credited":
 		return "User balance updated."
+	case "email-updated":
+		return "User email address updated."
+	case "email-in-use":
+		return "That email address is already assigned to another user."
 	default:
 		return ""
 	}

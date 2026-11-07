@@ -161,7 +161,31 @@ func TestTemplatesParseAndRender(t *testing.T) {
 			if test.name == "users" && !strings.Contains(recorder.Body.String(), "/users/7/reactivate") {
 				t.Fatalf("removed user has no reactivation action: %s", recorder.Body.String())
 			}
+			if test.name == "users" &&
+				(!strings.Contains(recorder.Body.String(), "/users/7/email") ||
+					!strings.Contains(recorder.Body.String(), `name="csrf"`) ||
+					!strings.Contains(recorder.Body.String(), `name="email"`)) {
+				t.Fatalf("user email edit form is missing: %s", recorder.Body.String())
+			}
 		})
+	}
+}
+
+func TestUpdateUserEmailRejectsInvalidAddress(t *testing.T) {
+	app := &App{}
+	request := httptest.NewRequest(
+		http.MethodPost,
+		"/users/7/email",
+		strings.NewReader("email=not-an-email"),
+	)
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	request.SetPathValue("id", "7")
+	response := httptest.NewRecorder()
+
+	app.updateUserEmail(response, request)
+
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusBadRequest)
 	}
 }
 
